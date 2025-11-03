@@ -55,7 +55,7 @@ def V_cycle(u0, v0, Ix, Iy, lmbda, reg, rhsu, rhsv, s1, s2, level, max_level):
         e2hu,e2hv = OF_cg(np.zeros_like(r2hu), np.zeros_like(r2hv),
             Ix2h, Iy2h, reg, rhsu, rhsv, 1e-8, 1000, level+1)
     else:
-        e2hu,e2hv = V_cycle(np.zeros_like(r2hu), np.zeros_like(size(r2hv)),
+        e2hu,e2hv = V_cycle(np.zeros_like(r2hu), np.zeros_like(r2hv),
             Ix2h, Iy2h, reg, r2hu, r2hv, s1, s2, level+1, max_level)
         
     ehu,ehv = prolongation(e2hu, e2hv)
@@ -82,25 +82,57 @@ def smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level, s):
     u - numerical solution for u
     v - numerical solution for v
     '''
+    #Padding u0 and v0 with zeros for boundary conditions
     n,m = u0.shape
-    u = u0.copy()
-    v = v0.copy()
+    u = np.zeros((n+2,m+2))
+    u[1:-1,1:-1] = u0
+    v = np.zeros((n+2,m+2))
+    v[1:-1,1:-1] = v0
     for _ in range(s):
-        u, v = RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv, n, m)
+        u, v = RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv)
     return u, v
 
-def RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv, n, m):
-    #TODO: Think about boundary....
+def RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv):
+    '''
+    One Red-Black Gauss-Seidel iteration for the optical flow problem.
+    input:
+    u - current solution for u
+    v - current solution for v
+    Ix - x-derivative of the first frame
+    Iy - y-derivative of the first frame
+    reg - regularisation parameter (lmbda)
+    rhsu - right-hand side in the equation for u
+    rhsv - right-hand side in the equation for v
+    n - number of rows
+    m - number of columns
+    output:
+    u - updated solution for u
+    v - updated solution for v
+    '''
+    n,m = u.shape
+    #Red update
+    #Possible to do this without double for-loop?????????
     for i in range(1,n-1):
             for j in range(1,m-1):
                 if (i+j) % 2 == 0:
-                    u[i,j] = 0.25 * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1] + rhsu[i,j])
-                    v[i,j] = 0.25 * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1] + rhsv[i,j])
+                    Ix_ij = Ix[i-1,j-1]
+                    Iy_ij = Iy[i-1,j-1]
+                    denom_u = Ix_ij**2 + reg*4
+                    denom_v = Iy_ij**2 + reg*4
+
+                    u[i,j] = (rhsu[i,j] + reg * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1]) - Ix_ij*Iy_ij*v[i,j]) / denom_u
+                    v[i,j] = (rhsv[i,j] + reg * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1]) - Ix_ij*Iy_ij*u[i,j]) / denom_v
+    #Black update
     for i in range(1,n-1):
             for j in range(1,m-1):
                 if (i+j) % 2 == 1:
-                    u[i,j] = 0.25 * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1] + rhsu[i,j])
-                    v[i,j] = 0.25 * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1] + rhsv[i,j])
+                    Ix_ij = Ix[i-1,j-1]
+                    Iy_ij = Iy[i-1,j-1]
+                    denom_u = Ix_ij**2 + reg*4
+                    denom_v = Iy_ij**2 + reg*4
+
+                    u[i,j] = (rhsu[i,j] + reg * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1]) - Ix_ij*Iy_ij*v[i,j]) / denom_u
+                    v[i,j] = (rhsv[i,j] + reg * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1]) - Ix_ij*Iy_ij*u[i,j]) / denom_v
     return u, v
 
 def residual(u, v, Ix, Iy, reg, rhsu, rhsv):
@@ -162,7 +194,7 @@ def prolongation(e2hu, e2hv):
     #internal points
     ehu[1:-1,1:-1] = 0.25 * (e2hu[:-1,:-1] + e2hu[1:,:-1] + e2hu[:-1,1:] + e2hu[1:,1:])
     ehv[1:-1,1:-1] = 0.25 * (e2hv[:-1,:-1] + e2hv[1:,:-1] + e2hv[:-1,1:] + e2hv[1:,1:])
-    
+    #SHOULD MAYBE BE MULTIPLIED BY 0.25, BECAUSE OF DIRICHLET BOUNDARY CONDITIONS?
     #upper boundary
     ehu[0,1:-1] = 0.5 * (e2hu[0,:-1] + e2hu[0,1:])
     ehv[0,1:-1] = 0.5 * (e2hv[0,:-1] + e2hv[0,1:])
