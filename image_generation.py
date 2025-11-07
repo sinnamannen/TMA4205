@@ -110,14 +110,14 @@ def generate_test_image(n, testcase=1):
         I2_1 = gauss(X-n*(pos_x+dx), Y-n*(pos_y+dy), n*sigma)
 
         pos_x, pos_y = 0.5, 0.7
-        sigma = 0.1;
+        sigma = 0.1
         dx, dy = -0.05, -0.05
 
         I1_2 = gauss(X-n*pos_x, Y-n*pos_y, n*sigma)
         I2_2 = gauss(X-n*(pos_x+dx), Y-n*(pos_y+dy), n*sigma)
 
-        I1 = np.maximum(I1_1,I1_2);
-        I2 = np.maximum(I2_1,I2_2);
+        I1 = np.maximum(I1_1,I1_2)
+        I2 = np.maximum(I2_1,I2_2)
     else:
         raise ValueError(f"Testcase {testcase} is not defined.")
         

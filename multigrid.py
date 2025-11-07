@@ -1,33 +1,21 @@
 import numpy as np
+from conjugate_gradient import OF_cg
+from preprocessing import get_derivatives_and_rhs
+from compute import residual
 
-def laplacian(u):
-    n, m = u.shape
-    laplace_u = np.zeros_like(u)
-    laplace_u[1:n-1,1:m-1] = -4*u[1:n-1,1:m-1] + u[0:n-2,1:m-1] + u[2:n,1:m-1] + u[1:n-1,0:m-2] + u[1:n-1,2:m]
-
-    return laplace_u
-
-def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
-    '''
-    The CG method for the optimal flow problem
-    input:
-    u0 - initial guess for u
-    v0 - initial guess for v
-    Ix - x-derivative of the first frame
-    Iy - y-derivative of the first framereg - regularisation parameter lmbda
-    rhsu - right-hand side in the equation for u
-    rhsv - right-hand side in the equation for v
-    tol - relative residual tolerance
-    maxit - maximum number of iterations
-    output:
-    u - numerical solution for u
-    v - numerical solution for v
-    '''
-    
-    return 0
+def multigrid_main(image_path1, image_path2, reg, s1, s2, max_level):
+    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(image_path1, image_path2)
+    # Initialize the solution
+    u0 = np.zeros_like(Ix)
+    v0 = np.zeros_like(Iy)
+    # Call the V-cycle
+    u, v = V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, 0, max_level)
+    return u, v
 
 
-def V_cycle(u0, v0, Ix, Iy, lmbda, reg, rhsu, rhsv, s1, s2, level, max_level):
+
+
+def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
     '''
     V-cycle for the optical flow problem.
     input:
@@ -61,7 +49,7 @@ def V_cycle(u0, v0, Ix, Iy, lmbda, reg, rhsu, rhsv, s1, s2, level, max_level):
     ehu,ehv = prolongation(e2hu, e2hv)
     u = u + ehu
     v = v + ehv
-    u,v = smoothing(u, v, Ix, Iy, lmbda, rhsu, rhsv, level, s2)
+    u,v = smoothing(u, v, Ix, Iy, reg, rhsu, rhsv, level, s2)
     return u, v
 
 def smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level, s):
@@ -135,25 +123,7 @@ def RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv):
                     v[i,j] = (rhsv[i,j] + reg * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1]) - Ix_ij*Iy_ij*u[i,j]) / denom_v
     return u, v
 
-def residual(u, v, Ix, Iy, reg, rhsu, rhsv):
-    '''
-    Compute the residual for the optical flow problem.
-    input:
-    u - current solution for u
-    v - current solution for v
-    Ix - x-derivative of the first frame
-    Iy - y-derivative of the first frame
-    reg - regularisation parameter (lmbda)
-    rhsu - right-hand side in the equation for u
-    rhsv - right-hand side in the equation for v
-    output:
-    rhu - residual for u
-    rhv - residual for v
-    '''
-    
-    rhu = rhsu - (Ix * (Ix * u + Iy * v) + reg * laplacian(u))
-    rhv = rhsv - (Iy * (Ix * u + Iy * v) + reg * laplacian(v))
-    return rhu, rhv
+
 
 def restriction(rhu, rhv, Ix, Iy):
     '''
