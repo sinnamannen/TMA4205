@@ -31,12 +31,12 @@ def calculate_image_derivatives(img0, img1):
     #Calculate Iy
     Iy_0 = np.zeros_like(img0) 
     Iy_1 = np.zeros_like(img0)
-    #Note, y-axis is flipped in images (not 100% sure if we need to do this)
-    Iy_0[1:,:] = img0[:-1,:] - img0[1:,:]
-    Iy_0[0,:] = Iy_0[1,:]
+    
+    Iy_0[:-1,:] = img0[1:,:] - img0[:-1,:]
+    Iy_0[-1,:] = Iy_0[-2,:]
 
-    Iy_1[1:,:] = img1[:-1,:] - img1[1:,:]
-    Iy_1[0,:] = Iy_1[1,:]
+    Iy_1[:-1,:] = img1[1:,:] - img1[:-1,:]
+    Iy_1[-1,:] = Iy_1[-2,:]
 
     Iy = (Iy_0 + Iy_1) / 2.0
     
@@ -55,3 +55,4 @@ def get_rhs(Ix, Iy, It):
     rhsu = -It * Ix
     rhsv = -It * Iy
     return rhsu, rhsv
+

@@ -1,9 +1,8 @@
 import numpy as np
 
 def laplacian(u):
-    n, m = u.shape
     u_padded = np.pad(u, pad_width=1, mode='constant', constant_values=0)
-    laplace_u = -4*u + u_padded[0:-2,1:-1] + u_padded[2:,1:-1] + u_padded[1:-1,0:-2] + u_padded[1:-1,2:]
+    laplace_u = -4*u + u_padded[:-2,1:-1] + u_padded[2:,1:-1] + u_padded[1:-1,:-2] + u_padded[1:-1,2:]
 
     return laplace_u
 
