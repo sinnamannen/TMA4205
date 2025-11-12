@@ -40,8 +40,9 @@ def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
     r2hu,r2hv,Ix2h,Iy2h = restriction(rhu, rhv, Ix, Iy)
     
     if level == max_level - 1:
+        cg_reg = reg * 4**(-level)
         e2hu,e2hv = OF_cg(np.zeros_like(r2hu), np.zeros_like(r2hv),
-            Ix2h, Iy2h, reg, rhsu, rhsv, 1e-8, 1000, level+1)
+            Ix2h, Iy2h, cg_reg, rhsu, rhsv, 1e-8, 1000, level+1)
     else:
         e2hu,e2hv = V_cycle(np.zeros_like(r2hu), np.zeros_like(r2hv),
             Ix2h, Iy2h, reg, r2hu, r2hv, s1, s2, level+1, max_level)
@@ -70,6 +71,7 @@ def smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level, s):
     u - numerical solution for u
     v - numerical solution for v
     '''
+    reg = reg * 4**(-level)
     #Padding u0 and v0 with zeros for boundary conditions
     n,m = u0.shape
     u = np.zeros((n+2,m+2))
@@ -98,7 +100,28 @@ def RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv):
     v - updated solution for v
     '''
     n,m = u.shape
+    
+    denom = Ix**2 + reg*4
+        
     #Red update
+    #Do only half of the points at once to be able to vectorize
+    #First half
+    u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ix[::2, ::2]*Iy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom[::2, ::2]
+    v[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ix[::2, ::2]*Iy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom[::2, ::2]
+    #Second half
+    u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ix[1::2, 1::2]*Iy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom[1::2, 1::2]
+    v[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ix[1::2, 1::2]*Iy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom[1::2, 1::2]
+    
+    #Black update
+    #First half
+    u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ix[::2, 1::2]*Iy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom[::2, 1::2]
+    v[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ix[::2, 1::2]*Iy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom[::2, 1::2]
+    #Second half
+    u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ix[1::2, ::2]*Iy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom[1::2, ::2]
+    v[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ix[1::2, ::2]*Iy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom[1::2, ::2]
+    
+    
+    '''
     #Possible to do this without double for-loop?????????
     for i in range(1,n-1):
             for j in range(1,m-1):
@@ -121,6 +144,7 @@ def RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv):
 
                     u[i,j] = (rhsu[i,j] + reg * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1]) - Ix_ij*Iy_ij*v[i,j]) / denom_u
                     v[i,j] = (rhsv[i,j] + reg * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1]) - Ix_ij*Iy_ij*u[i,j]) / denom_v
+    '''
     return u, v
 
 
