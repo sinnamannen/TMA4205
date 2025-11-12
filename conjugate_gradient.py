@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from compute import residual, lhs
-from preprocessing import get_derivatives_and_rhs
+from image_generation import generate_test_image, mycomputeColor
+from preprocessing import calculate_image_derivatives, get_derivatives_and_rhs, get_rhs
 
 def cg_main(image_path1, image_path2, reg, tol=1.e-8, maxit=2000):
     Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(image_path1, image_path2)
@@ -28,6 +30,8 @@ def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
     u - numerical solution for u
     v - numerical solution for v
     '''
+    #List to store residual norms
+    res_norms = []
     # Initialize variables
     u = u0.copy()
     v = v0.copy()
@@ -37,21 +41,29 @@ def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
     p_v = rhv.copy()
     rs_0 = np.sum(rhu**2) + np.sum(rhv**2)
     rsold = rs_0
+    res_norms.append(np.sqrt(rsold))
+    
     for it in range(maxit):
         Ap_u, Ap_v = lhs(p_u, p_v, Ix, Iy, reg)
-        #To avoid division by zero, dont know if this messes up anything
-        alpha = rsold / (np.sum(p_u * Ap_u) + np.sum(p_v * Ap_v) + 1e-10)
+        alpha = rsold / (np.sum(Ap_u*p_u) + np.sum(Ap_v*p_v))
+        
         u = u + alpha * p_u
         v = v + alpha * p_v
+        
         rhu = rhu - alpha * Ap_u
         rhv = rhv - alpha * Ap_v
         rsnew = np.sum(rhu**2) + np.sum(rhv**2)
+        beta = rsnew / rsold
+        
         # Check for convergence
-        if np.sqrt(rsnew/rsold) < tol:
+        if np.sqrt(rsnew/rs_0) < tol:
             break
-        p_u = rhu + (rsnew / rsold) * p_u
-        p_v = rhv + (rsnew / rsold) * p_v
+        
+        p_u = rhu + beta * p_u
+        p_v = rhv + beta * p_v
         rsold = rsnew
         #Note norm of residual is squared
-    print(it)
-    return u, v, rsnew, it+1
+        
+    return u, v, res_norms, it+1
+
+

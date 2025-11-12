@@ -161,31 +161,9 @@ def prolongation(e2hu, e2hv):
     ehu = np.zeros((2*n, 2*m))
     ehv = np.zeros((2*n, 2*m))
     
-    #internal points
-    ehu[1:-1,1:-1] = 0.25 * (e2hu[:-1,:-1] + e2hu[1:,:-1] + e2hu[:-1,1:] + e2hu[1:,1:])
-    ehv[1:-1,1:-1] = 0.25 * (e2hv[:-1,:-1] + e2hv[1:,:-1] + e2hv[:-1,1:] + e2hv[1:,1:])
-    #SHOULD MAYBE BE MULTIPLIED BY 0.25, BECAUSE OF DIRICHLET BOUNDARY CONDITIONS?
-    #upper boundary
-    ehu[0,1:-1] = 0.5 * (e2hu[0,:-1] + e2hu[0,1:])
-    ehv[0,1:-1] = 0.5 * (e2hv[0,:-1] + e2hv[0,1:])
-    #lower boundary
-    ehu[-1,1:-1] = 0.5 * (e2hu[-1,:-1] + e2hu[-1,1:])
-    ehv[-1,1:-1] = 0.5 * (e2hv[-1,:-1] + e2hv[-1,1:])
-    #left boundary
-    ehu[1:-1,0] = 0.5 * (e2hu[:-1,0] + e2hu[1:,0])
-    ehv[1:-1,0] = 0.5 * (e2hv[:-1,0] + e2hv[1:,0])
-    #right boundary
-    ehu[1:-1,-1] = 0.5 * (e2hu[:-1,-1] + e2hu[1:,-1])
-    ehv[1:-1,-1] = 0.5 * (e2hv[:-1,-1] + e2hv[1:,-1])
-    
-    #corners
-    ehu[0,0] = e2hu[0,0]
-    ehv[0,0] = e2hv[0,0]
-    ehu[0,-1] = e2hu[0,-1]
-    ehv[0,-1] = e2hv[0,-1]
-    ehu[-1,0] = e2hu[-1,0]
-    ehv[-1,0] = e2hv[-1,0]
-    ehu[-1,-1] = e2hu[-1,-1]
-    ehv[-1,-1] = e2hv[-1,-1]
+    ehu[0::2, 0::2] = e2hu
+    ehu[1::2, 0::2] = e2hu
+    ehu[0::2, 1::2] = e2hu
+    ehu[1::2, 1::2] = e2hu
     
     return ehu, ehv
