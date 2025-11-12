@@ -51,6 +51,19 @@ def get_derivatives_and_rhs(filepath1, filepath2):
     rhsu, rhsv = get_rhs(Ix, Iy, It)
     return Ix, Iy, rhsu, rhsv
 
+def get_derivatives_and_rhs(filepath1, filepath2, from_file=False):
+    if from_file:
+        img0 = load_image(filepath1)
+        img1 = load_image(filepath2)
+    else:
+        img0, img1 = filepath1, filepath2
+
+    img0 = preprocess_image(img0, sigma=1.0)
+    img1 = preprocess_image(img1, sigma=1.0)
+    Ix, Iy, It = calculate_image_derivatives(img0, img1)
+    rhsu, rhsv = get_rhs(Ix, Iy, It)
+    return Ix, Iy, rhsu, rhsv
+
 def get_rhs(Ix, Iy, It):
     rhsu = -It * Ix
     rhsv = -It * Iy

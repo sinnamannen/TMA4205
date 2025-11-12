@@ -1,4 +1,4 @@
-from time import time
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 from compute import residual, lhs
@@ -12,8 +12,8 @@ def cg_main(image_path1, image_path2, reg, tol=1.e-8, maxit=2000):
     u0 = np.zeros_like(Ix)
     v0 = np.zeros_like(Iy)
     # Call the CG solver
-    u, v, res, max_iter = OF_cg(u0, v0, Ix, Iy, reg, rhsu, rhsv, tol, maxit)
-    return u, v , res, max_iter
+    u, v, res, max_iter, elapsed_time = OF_cg(u0, v0, Ix, Iy, reg, rhsu, rhsv, tol, maxit)
+    return u, v , res, max_iter, elapsed_time
 
 
 def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
@@ -57,6 +57,8 @@ def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
         rhv = rhv - alpha * Ap_v
         rsnew = np.sum(rhu**2) + np.sum(rhv**2)
         beta = rsnew / rsold
+
+        res_norms.append(np.sqrt(rsold))
         
         # Check for convergence
         if np.sqrt(rsnew/rs_0) < tol:
