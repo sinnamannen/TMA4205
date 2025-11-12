@@ -1,8 +1,10 @@
+from time import time
 import numpy as np
 import matplotlib.pyplot as plt
 from compute import residual, lhs
 from image_generation import generate_test_image, mycomputeColor
 from preprocessing import calculate_image_derivatives, get_derivatives_and_rhs, get_rhs
+
 
 def cg_main(image_path1, image_path2, reg, tol=1.e-8, maxit=2000):
     Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(image_path1, image_path2)
@@ -30,6 +32,7 @@ def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
     u - numerical solution for u
     v - numerical solution for v
     '''
+    start_time = time.time()
     #List to store residual norms
     res_norms = []
     # Initialize variables
@@ -63,7 +66,8 @@ def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
         p_v = rhv + beta * p_v
         rsold = rsnew
         #Note norm of residual is squared
-        
-    return u, v, res_norms, it+1
+    
+    elapsed_time = time.time() - start_time
+    return u, v, res_norms, it+1, elapsed_time
 
 
