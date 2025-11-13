@@ -38,22 +38,17 @@ def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
     u,v = smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level,s1)
     rhu,rhv = residual(u, v, Ix, Iy, reg, rhsu, rhsv)
     r2hu,r2hv,Ix2h,Iy2h = restriction(rhu, rhv, Ix, Iy)
-    print(f"level: {level}, max_level: {max_level}")
     if level == max_level - 1:
         cg_reg = reg * 4**(-level)
-        print("start CG on coarsest level")
         
         e2hu,e2hv, _, _, _ = OF_cg(np.zeros_like(r2hu), np.zeros_like(r2hv),
             Ix2h, Iy2h, cg_reg, r2hu, r2hv, 1e-8, 1000)
-        print("finished CG on coarsest level")
     else:
         e2hu,e2hv = V_cycle(np.zeros_like(r2hu), np.zeros_like(r2hv),
             Ix2h, Iy2h, reg, r2hu, r2hv, s1, s2, level+1, max_level)
-    print(f"Prolongating from level {level+1} to level {level}")    
     ehu,ehv = prolongation(e2hu, e2hv)
     u = u + ehu
     v = v + ehv
-    print(f"level {level}: after prolongation")
     u,v = smoothing(u, v, Ix, Iy, reg, rhsu, rhsv, level, s2)
     return u, v
 
@@ -76,19 +71,20 @@ def smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level, s):
     u - numerical solution for u
     v - numerical solution for v
     '''
-    
+   
     reg = reg * 4**(-level)
+    denom_u = Ix**2 + reg*4
+    denom_v = Iy**2 + reg*4
+    Ixy = Ix * Iy
     #Padding u0 and v0 with zeros for boundary conditions
     n,m = u0.shape
-    u = np.zeros((n+2,m+2))
-    u[1:-1,1:-1] = u0
-    v = np.zeros((n+2,m+2))
-    v[1:-1,1:-1] = v0
+    u = np.pad(u0, pad_width=1, mode='constant', constant_values=0)
+    v = np.pad(v0, pad_width=1, mode='constant', constant_values=0)
     for _ in range(s):
-        u, v = RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv)
+        u, v = RBGS_step(u, v, denom_u, denom_v, Ixy, reg, rhsu, rhsv)
     return u[1:-1,1:-1], v[1:-1,1:-1]
 
-def RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv):
+def RBGS_step(u, v, denom_u, denom_v, Ixy, reg, rhsu, rhsv):
     '''
     One Red-Black Gauss-Seidel iteration for the optical flow problem.
     input:
@@ -105,44 +101,45 @@ def RBGS_step(u, v, Ix, Iy, reg, rhsu, rhsv):
     u - updated solution for u
     v - updated solution for v
     '''
-    n,m = u.shape
-    #TODO: THIS does not work
+    '''
+    def red_update(u, v, denom_u, Ixy, reg, rhsu):
+        u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
+        u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
+        return u
     
-    denom = Ix**2 + reg*4
-        
-    #Red update
-    #Do only half of the points at once to be able to vectorize
-    #First half
-    u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ix[::2, ::2]*Iy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom[::2, ::2]
-    v[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ix[::2, ::2]*Iy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom[::2, ::2]
-    #Second half
-    u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ix[1::2, 1::2]*Iy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom[1::2, 1::2]
-    v[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ix[1::2, 1::2]*Iy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom[1::2, 1::2]
+    def black_update(u, v, denom_u, Ixy, reg, rhsu):
+        u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
+        u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
+        return u
+    '''
+    ##Forward and backward sweep to maintain symmetry i.e. red-black-black-red
+    #Red 1 update
+    u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
+    v[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ixy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom_v[::2, ::2]
+    #Red 2 update
+    u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
+    v[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ixy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom_v[1::2, 1::2]
     
-    #Black update
-    #First half
-    u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ix[::2, 1::2]*Iy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom[::2, 1::2]
-    v[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ix[::2, 1::2]*Iy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom[::2, 1::2]
-    #Second half
-    u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ix[1::2, ::2]*Iy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom[1::2, ::2]
-    v[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ix[1::2, ::2]*Iy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom[1::2, ::2]
+    #Black 1 update
+    u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
+    v[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ixy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom_v[::2, 1::2]
+    #Black 2 update
+    u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
+    v[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ixy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom_v[1::2, ::2]
     
-    #Forward and backward sweep to maintain symmetry
-    #Black update
-    #First half
-    u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ix[::2, 1::2]*Iy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom[::2, 1::2]
-    v[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ix[::2, 1::2]*Iy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom[::2, 1::2]
-    #Second half
-    u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ix[1::2, ::2]*Iy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom[1::2, ::2]
-    v[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ix[1::2, ::2]*Iy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom[1::2, ::2]
-    #Red update
-    #Do only half of the points at once to be able to vectorize
-    #First half
-    u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ix[::2, ::2]*Iy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom[::2, ::2]
-    v[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ix[::2, ::2]*Iy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom[::2, ::2]
-    #Second half
-    u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ix[1::2, 1::2]*Iy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom[1::2, 1::2]
-    v[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ix[1::2, 1::2]*Iy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom[1::2, 1::2]
+    #Black 1 update
+    u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
+    v[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ixy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom_v[::2, 1::2]
+    #Black 2 update
+    u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
+    v[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ixy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom_v[1::2, ::2]
+    
+    #Red 1 update
+    u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
+    v[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ixy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom_v[::2, ::2]
+    #Red 2 update
+    u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
+    v[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ixy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom_v[1::2, 1::2]
     
     
     '''
