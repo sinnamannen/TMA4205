@@ -5,8 +5,7 @@ from scipy.ndimage import gaussian_filter
 def load_image(filepath):
     img = Image.open(filepath).convert('L')  # Convert to grayscale
     img = np.array(img, dtype=np.float32)
-    #Trenger vi normaliseting????????
-    img = img / 255.0  # Normalize to [0, 1]
+    
     return img
 
 def preprocess_image(img, sigma=1.0):
@@ -42,27 +41,18 @@ def calculate_image_derivatives(img0, img1):
     
     return Ix, Iy, It
 
-def get_derivatives_and_rhs(filepath1, filepath2):
-    img0 = load_image(filepath1)
-    img1 = load_image(filepath2)
-    img0 = preprocess_image(img0, sigma=1.0)
-    img1 = preprocess_image(img1, sigma=1.0)
-    Ix, Iy, It = calculate_image_derivatives(img0, img1)
-    rhsu, rhsv = get_rhs(Ix, Iy, It)
-    return Ix, Iy, rhsu, rhsv
-
-def get_derivatives_and_rhs(filepath1, filepath2, from_file=False):
+def get_derivatives_and_rhs(img0, img1, from_file=False, preprocess=False):
     if from_file:
-        img0 = load_image(filepath1)
-        img1 = load_image(filepath2)
-    else:
-        img0, img1 = filepath1, filepath2
-
-    img0 = preprocess_image(img0, sigma=1.0)
-    img1 = preprocess_image(img1, sigma=1.0)
+        img0 = load_image(img0)
+        img1 = load_image(img1)
+    if preprocess:
+        img0 = preprocess_image(img0, sigma=1.0)
+        img1 = preprocess_image(img1, sigma=1.0)
     Ix, Iy, It = calculate_image_derivatives(img0, img1)
     rhsu, rhsv = get_rhs(Ix, Iy, It)
     return Ix, Iy, rhsu, rhsv
+
+
 
 def get_rhs(Ix, Iy, It):
     rhsu = -It * Ix

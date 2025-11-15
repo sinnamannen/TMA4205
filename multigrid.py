@@ -3,8 +3,8 @@ from conjugate_gradient import OF_cg
 from preprocessing import get_derivatives_and_rhs
 from compute import residual
 
-def multigrid_main(image_path1, image_path2, reg, s1, s2, max_level):
-    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(image_path1, image_path2)
+def multigrid_main(img1, img2, reg, s1, s2, max_level, from_file=False, sigma=0):
+    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(img1, img2, from_file=from_file, sigma=sigma)
     # Initialize the solution
     u0 = np.zeros_like(Ix)
     v0 = np.zeros_like(Iy)
@@ -12,7 +12,7 @@ def multigrid_main(image_path1, image_path2, reg, s1, s2, max_level):
     u, v = V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, 0, max_level)
     return u, v
 
-
+    
 
 
 def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
@@ -101,72 +101,36 @@ def RBGS_step(u, v, denom_u, denom_v, Ixy, reg, rhsu, rhsv):
     u - updated solution for u
     v - updated solution for v
     '''
-    '''
+    
     def red_update(u, v, denom_u, Ixy, reg, rhsu):
+        #red 1
         u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
+        #red 2
         u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
         return u
     
     def black_update(u, v, denom_u, Ixy, reg, rhsu):
+        #black 1
         u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
+        #black 2
         u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
         return u
-    '''
+    
     ##Forward and backward sweep to maintain symmetry i.e. red-black-black-red
-    #Red 1 update
-    u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
-    v[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ixy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom_v[::2, ::2]
-    #Red 2 update
-    u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
-    v[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ixy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom_v[1::2, 1::2]
+    u = red_update(u, v, denom_u, Ixy, reg, rhsu)
+    v = red_update(v, u, denom_v, Ixy, reg, rhsv)
     
-    #Black 1 update
-    u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
-    v[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ixy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom_v[::2, 1::2]
-    #Black 2 update
-    u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
-    v[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ixy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom_v[1::2, ::2]
+    u = black_update(u, v, denom_u, Ixy, reg, rhsu)
+    v = black_update(v, u, denom_v, Ixy, reg, rhsv)
     
-    #Black 1 update
-    u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
-    v[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ixy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom_v[::2, 1::2]
-    #Black 2 update
-    u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
-    v[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ixy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom_v[1::2, ::2]
+    u = black_update(u, v, denom_u, Ixy, reg, rhsu)
+    v = black_update(v, u, denom_v, Ixy, reg, rhsv)
     
-    #Red 1 update
-    u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
-    v[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ixy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom_v[::2, ::2]
-    #Red 2 update
-    u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
-    v[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ixy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom_v[1::2, 1::2]
+    u = red_update(u, v, denom_u, Ixy, reg, rhsu)
+    v = red_update(v, u, denom_v, Ixy, reg, rhsv)
     
-    
-    '''
-    #Possible to do this without double for-loop?????????
-    for i in range(1,n-1):
-            for j in range(1,m-1):
-                if (i+j) % 2 == 0:
-                    Ix_ij = Ix[i-1,j-1]
-                    Iy_ij = Iy[i-1,j-1]
-                    denom_u = Ix_ij**2 + reg*4
-                    denom_v = Iy_ij**2 + reg*4
-
-                    u[i,j] = (rhsu[i,j] + reg * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1]) - Ix_ij*Iy_ij*v[i,j]) / denom_u
-                    v[i,j] = (rhsv[i,j] + reg * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1]) - Ix_ij*Iy_ij*u[i,j]) / denom_v
-    #Black update
-    for i in range(1,n-1):
-            for j in range(1,m-1):
-                if (i+j) % 2 == 1:
-                    Ix_ij = Ix[i-1,j-1]
-                    Iy_ij = Iy[i-1,j-1]
-                    denom_u = Ix_ij**2 + reg*4
-                    denom_v = Iy_ij**2 + reg*4
-
-                    u[i,j] = (rhsu[i,j] + reg * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1]) - Ix_ij*Iy_ij*v[i,j]) / denom_u
-                    v[i,j] = (rhsv[i,j] + reg * (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1]) - Ix_ij*Iy_ij*u[i,j]) / denom_v
-    '''
     return u, v
+    
 
 
 

@@ -47,32 +47,34 @@ def OF_pcg(u0, v0, Ix, Iy, reg, rhsu, rhsv, max_level=2, s1=3, s2=3, tol=1.e-8, 
     p_u = z_u.copy()
     p_v = z_v.copy()
     rs_0 = np.sum(rhu**2) + np.sum(rhv**2)
-    rsold = np.sum(rhu * z_u) + np.sum(rhv * z_v)
-    res_norms.append(np.sqrt(rsold))
+    r_z_old = np.sum(rhu * z_u) + np.sum(rhv * z_v)
+    res_norms.append(np.sqrt(rs_0))
     
     for it in range(maxit):
         Ap_u, Ap_v = lhs(p_u, p_v, Ix, Iy, reg)
-        alpha = np.sum(rhu * z_u) + np.sum(rhv * z_v) / (np.sum(Ap_u*p_u) + np.sum(Ap_v*p_v))
+        alpha = (np.sum(rhu * z_u) + np.sum(rhv * z_v)) / (np.sum(Ap_u*p_u) + np.sum(Ap_v*p_v))
         
         u = u + alpha * p_u
         v = v + alpha * p_v
         
         rhu = rhu - alpha * Ap_u
         rhv = rhv - alpha * Ap_v
+        
         z_u, z_v = V_cycle(np.zeros_like(rhu), np.zeros_like(rhv), Ix, Iy, reg, rhu, rhv, s1, s2, level = 0, max_level = max_level)
         
-        rsnew = np.sum(rhu * z_u) + np.sum(rhv * z_v)
-        beta = rsnew / rsold
+        rs_new = np.sum(rhu**2) + np.sum(rhv**2)
+        r_z_new = np.sum(rhu * z_u) + np.sum(rhv * z_v)
+        beta = r_z_new / r_z_old
 
-        res_norms.append(np.sqrt(rsold))
+        res_norms.append(np.sqrt(rs_new))
         
         # Check for convergence
-        if np.sqrt(rsnew/rs_0) < tol:
+        if np.sqrt(rs_new/rs_0) < tol:
             break
         
-        p_u = rhu + beta * p_u
-        p_v = rhv + beta * p_v
-        rsold = rsnew
+        p_u = z_u + beta * p_u
+        p_v = z_v + beta * p_v
+        r_z_old = r_z_new
         #Note norm of residual is squared
     
     elapsed_time = time.time() - start_time
