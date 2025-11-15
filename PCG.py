@@ -7,8 +7,8 @@ from multigrid import V_cycle
 from preprocessing import calculate_image_derivatives, get_derivatives_and_rhs, get_rhs
 
 
-def pcg_main(image_path1, image_path2, reg, max_level, s1, s2, tol=1.e-8, maxit=2000):
-    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(image_path1, image_path2)
+def pcg_main(img1, img2, reg, max_level, s1, s2, tol=1.e-8, maxit=2000, from_file=False, sigma=0):
+    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(img1, img2, from_file=from_file, sigma=sigma)
     # Initialize the solution
     u0 = np.zeros_like(Ix)
     v0 = np.zeros_like(Iy)

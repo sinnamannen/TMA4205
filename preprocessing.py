@@ -41,13 +41,13 @@ def calculate_image_derivatives(img0, img1):
     
     return Ix, Iy, It
 
-def get_derivatives_and_rhs(img0, img1, from_file=False, preprocess=False):
+def get_derivatives_and_rhs(img0, img1, from_file=False, sigma=0):
     if from_file:
         img0 = load_image(img0)
         img1 = load_image(img1)
-    if preprocess:
-        img0 = preprocess_image(img0, sigma=1.0)
-        img1 = preprocess_image(img1, sigma=1.0)
+    if sigma > 0:
+        img0 = preprocess_image(img0, sigma=sigma)
+        img1 = preprocess_image(img1, sigma=sigma)
     Ix, Iy, It = calculate_image_derivatives(img0, img1)
     rhsu, rhsv = get_rhs(Ix, Iy, It)
     return Ix, Iy, rhsu, rhsv
