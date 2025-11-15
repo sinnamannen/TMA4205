@@ -12,6 +12,9 @@ def multigrid_main(img1, img2, reg, s1, s2, max_level, from_file=False, sigma=0)
     u, v = V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, 0, max_level)
     return u, v
 
+
+
+
 def smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level, s):
     '''
     Smoothing for the optical flow problem.
@@ -63,34 +66,46 @@ def RBGS_step(u, v, denom_u, denom_v, Ixy, reg, rhsu, rhsv):
     '''
     
     def red_update(u, v, denom_u, Ixy, reg, rhsu):
+        u_new = np.copy(u)
+        v_new = np.copy(v)
         #red 1
-        u[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
+        u_new[1:-1:2,1:-1:2] = (rhsu[::2, ::2] + reg * (u[0:-2:2,1:-1:2] + u[2::2,1:-1:2] + u[1:-1:2,0:-2:2] + u[1:-1:2,2::2]) - Ixy[::2, ::2]*v[1:-1:2,1:-1:2]) / denom_u[::2, ::2]
+        
+        v_new[1:-1:2,1:-1:2] = (rhsv[::2, ::2] + reg * (v[0:-2:2,1:-1:2] + v[2::2,1:-1:2] + v[1:-1:2,0:-2:2] + v[1:-1:2,2::2]) - Ixy[::2, ::2]*u[1:-1:2,1:-1:2]) / denom_v[::2, ::2]
+        
         #red 2
-        u[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
-        return u
+        u_new[2:-1:2,2:-1:2] = (rhsu[1::2, 1::2] + reg * (u[1:-2:2,2:-1:2] + u[3::2,2:-1:2] + u[2:-1:2,1:-2:2] + u[2:-1:2,3::2]) - Ixy[1::2, 1::2]*v[2:-1:2,2:-1:2]) / denom_u[1::2, 1::2]
+        
+        v_new[2:-1:2,2:-1:2] = (rhsv[1::2, 1::2] + reg * (v[1:-2:2,2:-1:2] + v[3::2,2:-1:2] + v[2:-1:2,1:-2:2] + v[2:-1:2,3::2]) - Ixy[1::2, 1::2]*u[2:-1:2,2:-1:2]) / denom_v[1::2, 1::2]
+        
+        return u_new, v_new
     
     def black_update(u, v, denom_u, Ixy, reg, rhsu):
+        u_new = np.copy(u)
+        v_new = np.copy(v)
         #black 1
-        u[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
+        u_new[1:-1:2,2:-1:2] = (rhsu[::2, 1::2] + reg * (u[0:-2:2,2:-1:2] + u[2::2,2:-1:2] + u[1:-1:2,1:-2:2] + u[1:-1:2,3::2]) - Ixy[::2, 1::2]*v[1:-1:2,2:-1:2]) / denom_u[::2, 1::2]
+        
+        v_new[1:-1:2,2:-1:2] = (rhsv[::2, 1::2] + reg * (v[0:-2:2,2:-1:2] + v[2::2,2:-1:2] + v[1:-1:2,1:-2:2] + v[1:-1:2,3::2]) - Ixy[::2, 1::2]*u[1:-1:2,2:-1:2]) / denom_v[::2, 1::2]
+        
         #black 2
-        u[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
-        return u
+        u_new[2:-1:2,1:-1:2] = (rhsu[1::2, ::2] + reg * (u[1:-2:2,1:-1:2] + u[3::2,1:-1:2] + u[2:-1:2,0:-2:2] + u[2:-1:2,2::2]) - Ixy[1::2, ::2]*v[2:-1:2,1:-1:2]) / denom_u[1::2, ::2]
+        
+        v_new[2:-1:2,1:-1:2] = (rhsv[1::2, ::2] + reg * (v[1:-2:2,1:-1:2] + v[3::2,1:-1:2] + v[2:-1:2,0:-2:2] + v[2:-1:2,2::2]) - Ixy[1::2, ::2]*u[2:-1:2,1:-1:2]) / denom_v[1::2, ::2]
+        return u_new, v_new
     
-    ##Forward and backward sweep to maintain symmetry i.e. red-black-black-red
-    u = red_update(u, v, denom_u, Ixy, reg, rhsu)
-    v = red_update(v, u, denom_v, Ixy, reg, rhsv)
+    ##Forward and backward sweep to maintain symmetry i.e. red-black-black-red updates
+    u,v = red_update(u, v, denom_u, Ixy, reg, rhsu)
+   
+    u,v = black_update(u, v, denom_u, Ixy, reg, rhsu)
     
-    u = black_update(u, v, denom_u, Ixy, reg, rhsu)
-    v = black_update(v, u, denom_v, Ixy, reg, rhsv)
+    u,v = black_update(u, v, denom_u, Ixy, reg, rhsu)
     
-    u = black_update(u, v, denom_u, Ixy, reg, rhsu)
-    v = black_update(v, u, denom_v, Ixy, reg, rhsv)
-    
-    u = red_update(u, v, denom_u, Ixy, reg, rhsu)
-    v = red_update(v, u, denom_v, Ixy, reg, rhsv)
+    u,v = red_update(u, v, denom_u, Ixy, reg, rhsu)
     
     return u, v
     
+
 
 def restriction(rhu, rhv, Ix, Iy):
     '''
@@ -142,8 +157,6 @@ def prolongation(e2hu, e2hv):
     
     return ehu, ehv
 
-
-
 def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
     '''
     V-cycle for the optical flow problem.
@@ -181,4 +194,7 @@ def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
     u,v = smoothing(u, v, Ix, Iy, reg, rhsu, rhsv, level, s2)
     return u, v
   
+
+
+
 
