@@ -2,6 +2,7 @@ import numpy as np
 from conjugate_gradient import OF_cg
 from preprocessing import get_derivatives_and_rhs
 from compute import residual
+import time
 
 def multigrid_main(img1, img2, reg, s1, s2, max_level, from_file=False, sigma=0):
     Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(img1, img2, from_file=from_file, sigma=sigma)
@@ -182,3 +183,47 @@ def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
     return u, v
   
 
+
+def multigrid_main_iterative(img1, img2, reg, s1, s2, max_level, from_file=False, sigma=0, tol=1e-8, max_cycles=100):
+    """
+    Full iterative MG solver performing repeated V-cycles.
+    Returns:
+        u, v          final solution
+        res_list     residual history
+        elapsed      total computation time
+    """
+    # Compute derivatives + RHS
+    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(
+        img1, img2, from_file=from_file, sigma=sigma
+    )
+
+    # Initial guess
+    u = np.zeros_like(Ix)
+    v = np.zeros_like(Iy)
+
+    # Compute initial residual
+    rhu, rhv = residual(u, v, Ix, Iy, reg, rhsu, rhsv)
+    r0 = np.sqrt(np.sum(rhu**2) + np.sum(rhv**2))
+
+    res_list = [1.0]  # normalized residual
+
+    # Start timing
+    start = time.time()
+
+    for cycle in range(max_cycles):
+
+        # Perform a single V-cycle
+        u, v = V_cycle(u, v, Ix, Iy, reg, rhsu, rhsv,
+                       s1, s2, level=0, max_level=max_level)
+
+        # Compute residual
+        rhu, rhv = residual(u, v, Ix, Iy, reg, rhsu, rhsv)
+        r = np.sqrt(np.sum(rhu**2) + np.sum(rhv**2))
+        res_list.append(r / r0)
+
+        # Check convergence
+        if r / r0 < tol:
+            break
+
+    elapsed = time.time() - start
+    return u, v, res_list, elapsed
