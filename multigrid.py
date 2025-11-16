@@ -43,7 +43,7 @@ def smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level, s):
     for _ in range(s):
         u, v = RBGS_step(u, v, denom_u, denom_v, Ixy, reg, rhsu, rhsv)
     return u[1:-1,1:-1], v[1:-1,1:-1]
-    
+
 
 def RBGS_step(u, v, denom_u, denom_v, Ixy, reg, rhsu, rhsv):
     '''
