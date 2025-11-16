@@ -33,6 +33,7 @@ def smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level, s):
     '''
     
     reg = reg * 4**(-level)
+    #reg = reg * 4**(level)
     denom_u = Ix**2 + reg*4
     denom_v = Iy**2 + reg*4
     Ixy = Ix * Iy
@@ -167,9 +168,11 @@ def V_cycle(u0, v0, Ix, Iy, reg, rhsu, rhsv, s1, s2, level, max_level):
     
     u,v = smoothing(u0, v0, Ix, Iy, reg, rhsu, rhsv, level,s1)
     rhu,rhv = residual(u, v, Ix, Iy, reg * 4**(-level), rhsu, rhsv)
+    #rhu,rhv = residual(u, v, Ix, Iy, reg * 4**(level), rhsu, rhsv)
     r2hu,r2hv,Ix2h,Iy2h = restriction(rhu, rhv, Ix, Iy)
     if level == max_level - 1:
         cg_reg = reg * 4**(-max_level)
+        #cg_reg = reg * 4**(max_level)
         
         e2hu,e2hv, _, _, _ = OF_cg(np.zeros_like(r2hu), np.zeros_like(r2hv),
             Ix2h, Iy2h, cg_reg, r2hu, r2hv, 1e-8, 1000)
