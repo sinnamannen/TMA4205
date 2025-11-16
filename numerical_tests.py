@@ -64,7 +64,7 @@ def plot_gerhsgorin_disks():
     plt.show()
 
 def plot_method_solution(N=256, testcase=1, method="CG",
-                         mg_s1=2, mg_s2=2, mg_max_level=3):
+                         mg_s1=2, mg_s2=2, mg_max_level=3, sigma=0):
 
     # --- Generate test images ---
     I1, I2 = generate_test_image(N, testcase=testcase)
@@ -75,7 +75,7 @@ def plot_method_solution(N=256, testcase=1, method="CG",
 
     # --- Solve optical flow ---
     if method == "CG":
-        u, v, _, _, _ = cg_main(I1, I2, reg)
+        u, v, _, _, _ = cg_main(I1, I2, reg, from_file=False, sigma=sigma)
     elif method == "MG":
         u, v, _, _ = multigrid_main_iterative(
             I1, I2, reg, s1=mg_s1, s2=mg_s2,
@@ -113,7 +113,7 @@ def plot_method_solution(N=256, testcase=1, method="CG",
     flow_overlay_img = mycomputeColor(u, v)
 
     # --- 2×2 PLOT ---
-    fig, axs = plt.subplots(2, 2, figsize=(8, 8))
+    fig, axs = plt.subplots(2, 2, figsize=(6, 6))
 
     # (0,0) Image 1
     axs[0, 0].imshow(I1, cmap="gray")
