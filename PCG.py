@@ -13,11 +13,11 @@ def pcg_main(img1, img2, reg, max_level, s1, s2, tol=1.e-8, maxit=2000, from_fil
     u0 = np.zeros_like(Ix)
     v0 = np.zeros_like(Iy)
     # Call the CG solver
-    u, v, res, max_iter, elapsed_time = OF_pcg(u0, v0, Ix, Iy, reg, rhsu, rhsv, max_level=max_level, s1=s1, s2=s2, tol=1.e-8, maxit=2000)
+    u, v, res, max_iter, elapsed_time = OF_pcg(u0, v0, Ix, Iy, reg, rhsu, rhsv, max_level=max_level, s1=s1, s2=s2, tol=tol, maxit=maxit)
     return u, v , res, max_iter, elapsed_time
 
 
-def OF_pcg(u0, v0, Ix, Iy, reg, rhsu, rhsv, max_level=2, s1=3, s2=3, tol=1.e-8, maxit=2000):
+def OF_pcg(u0, v0, Ix, Iy, reg, rhsu, rhsv, max_level=2, s1=3, s2=3, tol=1.e-8, maxit=200):
     '''
     The CG method for the optimal flow problem
     input:

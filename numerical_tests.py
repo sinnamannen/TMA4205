@@ -153,12 +153,8 @@ def plot_method_solution(N=256, testcase=1, method="CG",
 
     plt.tight_layout()
     plt.show()
-
-
-
-
-
-
+    
+        
 
 def run_single_method(method, ks, testcase=1, mg_s1=2, mg_s2=2, mg_max_level=3):
 
@@ -490,23 +486,24 @@ def plot_s1s2_heatmaps(svals, rho_mat, time_mat, L=None, method="MG", k=None, te
 
 ##############################################################################################
 
-def run_single_method_lambda(method, lambdas,
+def run_single_method_regs(method, regs,
                              mg_s1=2, mg_s2=2, mg_max_level=3,
-                             from_file=False, sigma=0):
+                             from_file=False, sigma=0, N=480):
 
-    result = {"times": [], "residuals": [], "lambdas": lambdas}
+    result = {"times": [], "residuals": [], "regs": regs}
 
     # Load real images ONCE
     I1 = plt.imread("frame10.png").astype(float)
     I2 = plt.imread("frame11.png").astype(float)
 
-    for reg in lambdas:
+    I1, I2 = generate_test_image(N, testcase=3)
+
+    for reg in regs:
+        print(reg)
 
         # ---------------- CG ----------------
         if method == "CG":
-            u, v, res, max_iter, elapsed = cg_main(
-                I1, I2, reg
-            )
+            u, v, res, max_iter, elapsed = cg_main(I1, I2, reg, tol=1.e-8, maxit=2000, from_file=False, sigma=0)
 
         # ---------------- PCG ----------------
         elif method == "PCG":
@@ -516,7 +513,7 @@ def run_single_method_lambda(method, lambdas,
                 s1=mg_s1,
                 s2=mg_s2,
                 tol=1e-8,
-                maxit=200,
+                maxit=50,
                 from_file=from_file,
                 sigma=sigma
             )
@@ -545,13 +542,13 @@ def run_single_method_lambda(method, lambdas,
 
     return result
 
-def plot_method_summary_lambda(lambdas, results, method="CG"):
+def plot_method_summary_regs(regs, results, method="CG"):
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
     # ------------------- CONVERGENCE PLOT -------------------
     ax1 = axes[0]
-    for lam, res in zip(lambdas, results["residuals"]):
+    for lam, res in zip(regs, results["residuals"]):
         ax1.plot(res, label=f"λ={lam}")
 
     ax1.set_yscale("log")
@@ -563,7 +560,7 @@ def plot_method_summary_lambda(lambdas, results, method="CG"):
 
     # ------------------- TIME VS LAMBDA -------------------
     ax2 = axes[1]
-    ax2.plot(lambdas, results["times"], "-o", linewidth=2)
+    ax2.plot(regs, results["times"], "-o", linewidth=2)
 
     ax2.set_xscale("log")
     ax2.set_yscale("log")
