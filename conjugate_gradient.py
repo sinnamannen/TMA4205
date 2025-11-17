@@ -6,8 +6,8 @@ from image_generation import generate_test_image, mycomputeColor
 from preprocessing import calculate_image_derivatives, get_derivatives_and_rhs, get_rhs
 
 
-def cg_main(img1, img2, reg, tol=1.e-8, maxit=2000, from_file=False, sigma=0):
-    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(img1, img2, from_file=from_file, sigma=sigma)
+def cg_main(image_path1, image_path2, reg, tol=1.e-8, maxit=2000, from_file=False, sigma=0):
+    Ix, Iy, rhsu, rhsv = get_derivatives_and_rhs(image_path1, image_path2, from_file=from_file, sigma=sigma)
     # Initialize the solution
     u0 = np.zeros_like(Ix)
     v0 = np.zeros_like(Iy)
@@ -58,7 +58,7 @@ def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
         rsnew = np.sum(rhu**2) + np.sum(rhv**2)
         beta = rsnew / rsold
 
-        res_norms.append(np.sqrt(rsold))
+        res_norms.append(np.sqrt(rsnew))
         
         # Check for convergence
         if np.sqrt(rsnew/rs_0) < tol:
