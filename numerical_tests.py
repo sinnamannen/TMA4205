@@ -633,3 +633,280 @@ def plot_compare_methods_regs(method_results_dict, method_params_dict):
 
     plt.tight_layout()
     plt.show()
+
+
+
+
+################# FINAL PLOTTING SHIT
+def plot_flow_row(results, ks, method="CG",
+                  testcase=2, mg_s1=5, mg_s2=5, mg_max_level=3,
+                  title=None):
+
+    # Ensure flow fields exist in results
+    if "u" not in results or "v" not in results:
+        results["u"] = []
+        results["v"] = []
+
+        for k in ks:
+            N = 2**k
+            reg = 4**(k - 4)
+            I1, I2 = generate_test_image(N, testcase=testcase)
+
+            if method == "CG":
+                u, v, _, _, _ = cg_main(I1, I2, reg)
+
+            elif method == "MG":
+                u, v, _, _ = multigrid_main_iterative(
+                    I1, I2, reg,
+                    s1=mg_s1, s2=mg_s2,
+                    max_level=mg_max_level,
+                    tol=1e-8, max_cycles=50
+                )
+
+            elif method == "PCG":
+                u, v, _, _, _ = pcg_main(
+                    I1, I2, reg,
+                    max_level=mg_max_level,
+                    s1=mg_s1, s2=mg_s2,
+                    tol=1e-8, maxit=200
+                )
+
+            else:
+                raise ValueError("method must be 'CG', 'MG', or 'PCG'")
+
+            results["u"].append(u)
+            results["v"].append(v)
+
+    # --- Plotting ---
+    num_plots = len(ks)
+    fig, axs = plt.subplots(1, num_plots, figsize=(4*num_plots, 4))
+
+    if num_plots == 1:
+        axs = [axs]
+
+    for ax, k, u, v in zip(axs, ks, results["u"], results["v"]):
+
+        flow_img = mycomputeColor(u, v)
+        ax.imshow(flow_img)
+        ax.axis("off")
+        ax.set_title(f"{method}, k={k}")
+
+    if title is not None:
+        fig.suptitle(title, fontsize=14)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+def plot_color_flow_row_regs(regs, method="CG",
+                             N=480, testcase=3,
+                             mg_s1=2, mg_s2=2, mg_max_level=3,
+                             sigma=0, title=None):
+    """
+    Plot a 1×len(regs) row of flow-field visualisations for different λ values.
+    Background = I1 (grayscale), overlay = color-coded flow with alpha.
+    Adds a color wheel in the LAST subplot.
+    """
+
+    # Generate the test images ONCE
+    I1, I2 = generate_test_image(N, testcase=testcase)
+
+    num = len(regs)
+    fig, axs = plt.subplots(1, num, figsize=(4*num, 4))
+    if num == 1:
+        axs = [axs]
+
+    # Loop over λ and compute flow each time
+    for idx, (ax, lam) in enumerate(zip(axs, regs)):
+
+        # ---- solve OF for this λ ----
+        if method == "CG":
+            u, v, _, _, _ = cg_main(I1, I2, lam,
+                                    tol=1e-8, maxit=2000,
+                                    from_file=False, sigma=sigma)
+
+        elif method == "PCG":
+            u, v, _, _, _ = pcg_main(
+                I1, I2, lam,
+                max_level=mg_max_level,
+                s1=mg_s1, s2=mg_s2,
+                tol=1e-8, maxit=200,
+                from_file=False, sigma=sigma
+            )
+
+        elif method == "MG":
+            u, v, _, _ = multigrid_main_iterative(
+                I1, I2, lam,
+                s1=mg_s1, s2=mg_s2,
+                max_level=mg_max_level,
+                tol=1e-8, max_cycles=50,
+                from_file=False, sigma=sigma
+            )
+
+        else:
+            raise ValueError("Unknown method")
+
+        # ---- Compute alpha from magnitude ----
+        mag = np.sqrt(u*u + v*v)
+        M = np.max(mag) + 1e-12
+        alpha = 0.8 * (mag / M)**0.4     # boosted color visibility
+
+        # ---- Color-coded flow image ----
+        flow_img = mycomputeColor(u, v)
+
+        # ---- Plot background + overlay ----
+        ax.imshow(I1, cmap="gray")
+        ax.imshow(flow_img, alpha=alpha)
+        ax.axis("off")
+        ax.set_title(f"λ={lam}")
+
+        # ---------------------------------------------------------------
+        # Add COLOR WHEEL ONLY TO THE LAST SUBPLOT
+        # ---------------------------------------------------------------
+        if idx == num - 1:
+            W = 128
+            yy, xx = np.mgrid[-1:1:complex(0, W), -1:1:complex(0, W)]
+            rad = np.sqrt(xx**2 + yy**2)
+
+            u_w = xx / (rad + 1e-6)
+            v_w = yy / (rad + 1e-6)
+
+            u_w[rad > 1] = 0
+            v_w[rad > 1] = 0
+
+            wheel_img = mycomputeColor(u_w, v_w)
+
+            inset = ax.inset_axes([0.72, 0.72, 0.26, 0.26])
+            inset.imshow(wheel_img)
+            inset.axis("off")
+
+    if title is not None:
+        fig.suptitle(title, fontsize=14)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_method_solution_real(method="CG",
+                              reg=1.0,
+                              sigma1=0,
+                              sigma2=1,
+                              mg_s1=5, mg_s2=5, mg_max_level=3,
+                              N=480):
+    """
+    Produce a 2×2 plot for REAL-IMAGE TESTCASE = 3:
+
+        (0,0) Image 1
+        (0,1) Image 2
+        (1,0) Flow overlay (σ = sigma1)
+        (1,1) Flow overlay (σ = sigma2)
+    """
+
+    # -------------------------------------------------------
+    # Load real test images from your generator
+    # -------------------------------------------------------
+    I1, I2 = generate_test_image(N, testcase=3)
+
+    # -------------------------------------------------------
+    # Helper: solve once for a given sigma
+    # -------------------------------------------------------
+    def solve(sig):
+        if method == "CG":
+            u, v, res, it, elapsed = cg_main(
+                I1, I2, reg,
+                tol=1e-8, maxit=2000,
+                from_file=False, sigma=sig
+            )
+            return u, v
+
+        elif method == "MG":
+            u, v, res, elapsed = multigrid_main_iterative(
+                I1, I2, reg,
+                s1=mg_s1, s2=mg_s2,
+                max_level=mg_max_level,
+                tol=1e-8, max_cycles=50,
+                from_file=False, sigma=sig
+            )
+            return u, v
+
+        elif method == "PCG":
+            u, v, res, it, elapsed = pcg_main(
+                I1, I2, reg,
+                max_level=mg_max_level,
+                s1=mg_s1, s2=mg_s2,
+                tol=1e-8, maxit=200,
+                from_file=False, sigma=sig
+            )
+            return u, v
+
+        else:
+            raise ValueError("Method must be CG, MG, or PCG")
+
+    # --- Solve twice ---
+    u1, v1 = solve(sigma1)
+    u2, v2 = solve(sigma2)
+
+    # -------------------------------------------------------
+    # Build flow overlays
+    # -------------------------------------------------------
+    def make_overlay(u, v):
+        flow_img = mycomputeColor(u, v)
+
+        mag = np.sqrt(u*u + v*v)
+        M = np.max(mag) + 1e-12
+
+        alpha = 0.8 * (mag / M)**0.4  # better visibility
+
+        return flow_img, alpha
+
+    flow1, alpha1 = make_overlay(u1, v1)
+    flow2, alpha2 = make_overlay(u2, v2)
+
+    # -------------------------------------------------------
+    # Create figure
+    # -------------------------------------------------------
+    fig, axs = plt.subplots(2, 2, figsize=(7, 7))
+
+    # Top row: raw frames
+    axs[0, 0].imshow(I1, cmap="gray")
+    axs[0, 0].set_title("Image 1")
+    axs[0, 0].axis("off")
+
+    axs[0, 1].imshow(I2, cmap="gray")
+    axs[0, 1].set_title("Image 2")
+    axs[0, 1].axis("off")
+
+    # Bottom row: flow overlays
+    axs[1, 0].imshow(I1, cmap="gray")
+    axs[1, 0].imshow(flow1, alpha=alpha1)
+    axs[1, 0].set_title(f"Flow (σ = {sigma1})")
+    axs[1, 0].axis("off")
+
+    axs[1, 1].imshow(I1, cmap="gray")
+    axs[1, 1].imshow(flow2, alpha=alpha2)
+    axs[1, 1].set_title(f"Flow (σ = {sigma2})")
+    axs[1, 1].axis("off")
+
+    # -------------------------------------------------------
+    # Color wheel in bottom right
+    # -------------------------------------------------------
+    W = 128
+    yy, xx = np.mgrid[-1:1:complex(0, W), -1:1:complex(0, W)]
+    rad = np.sqrt(xx**2 + yy**2)
+
+    u_w = xx / (rad + 1e-6)
+    v_w = yy / (rad + 1e-6)
+
+    u_w[rad > 1] = 0
+    v_w[rad > 1] = 0
+
+    wheel_img = mycomputeColor(u_w, v_w)
+
+    inset = axs[1, 1].inset_axes([0.72, 0.72, 0.26, 0.26])
+    inset.imshow(wheel_img)
+    inset.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
