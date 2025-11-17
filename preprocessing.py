@@ -1,10 +1,10 @@
-from PIL import Image
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
 def load_image(filepath):
-    img = Image.open(filepath).convert('L')  # Convert to grayscale
-    img = np.array(img, dtype=np.float32)
+    img = plt.imread(filepath)
+    img = img.astype(np.float32)
     
     return img
 
@@ -21,10 +21,10 @@ def calculate_image_derivatives(img0, img1):
     Ix_1 = np.zeros_like(img0)
 
     Ix_0[:,:-1] = img0[:, 1:] - img0[:, :-1]
-    Ix_0[:,-1] = Ix_0[:,-2]
+    Ix_0[:,-1] = img0[:, -1] - img0[:, -2]
 
     Ix_1[:,:-1] = img1[:, 1:] - img1[:, :-1]
-    Ix_1[:,-1] = Ix_1[:,-2]
+    Ix_1[:,-1] = img1[:, -1] - img1[:, -2]
 
     Ix = (Ix_0 + Ix_1) / 2.0
     #Calculate Iy
@@ -32,10 +32,10 @@ def calculate_image_derivatives(img0, img1):
     Iy_1 = np.zeros_like(img0)
     
     Iy_0[:-1,:] = img0[1:,:] - img0[:-1,:]
-    Iy_0[-1,:] = Iy_0[-2,:]
+    Iy_0[-1,:] = img0[-1,:] - img0[-2,:]
 
     Iy_1[:-1,:] = img1[1:,:] - img1[:-1,:]
-    Iy_1[-1,:] = Iy_1[-2,:]
+    Iy_1[-1,:] = img1[-1,:] - img1[-2,:]
 
     Iy = (Iy_0 + Iy_1) / 2.0
     

@@ -32,6 +32,7 @@ def OF_cg(u0,v0,Ix,Iy,reg,rhsu,rhsv,tol=1.e-8,maxit=2000):
     u - numerical solution for u
     v - numerical solution for v
     '''
+    
     start_time = time.time()
     #List to store residual norms
     res_norms = []

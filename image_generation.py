@@ -126,8 +126,8 @@ def generate_test_image(n, testcase=1):
         img2 = Image.open("frame11.png").convert("L")
 
         # Resize to n×n (here: n = 512)
-        img1 = img1.resize((n, n), Image.BICUBIC)
-        img2 = img2.resize((n, n), Image.BICUBIC)
+        #img1 = img1.resize((n, n), Image.BICUBIC)
+        #img2 = img2.resize((n, n), Image.BICUBIC)
 
         # Convert to float arrays
         I1 = np.array(img1, dtype=np.float64)
