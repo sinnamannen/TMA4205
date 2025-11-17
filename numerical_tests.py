@@ -153,8 +153,8 @@ def plot_method_solution(N=256, testcase=1, method="CG",
 
     plt.tight_layout()
     plt.show()
-    
-        
+
+
 
 def run_single_method(method, ks, testcase=1, mg_s1=2, mg_s2=2, mg_max_level=3):
 
@@ -492,18 +492,13 @@ def run_single_method_regs(method, regs,
 
     result = {"times": [], "residuals": [], "regs": regs}
 
-    # Load real images ONCE
-    I1 = plt.imread("frame10.png").astype(float)
-    I2 = plt.imread("frame11.png").astype(float)
-
     I1, I2 = generate_test_image(N, testcase=3)
 
     for reg in regs:
-        print(reg)
 
         # ---------------- CG ----------------
         if method == "CG":
-            u, v, res, max_iter, elapsed = cg_main(I1, I2, reg, tol=1.e-8, maxit=2000, from_file=False, sigma=0)
+            u, v, res, max_iter, elapsed = cg_main(I1, I2, reg, tol=1.e-8, maxit=2000, from_file=False, sigma=sigma)
 
         # ---------------- PCG ----------------
         elif method == "PCG":
@@ -568,6 +563,73 @@ def plot_method_summary_regs(regs, results, method="CG"):
     ax2.set_ylabel("Time (seconds)")
     ax2.set_title(f"{method} – Time vs λ")
     ax2.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_compare_methods_regs(method_results_dict, method_params_dict):
+    """
+    method_results_dict = {
+        "PCG": {"regs": [...], "residuals": [...], "times": [...]},
+        "MG":  {"regs": [...], "residuals": [...], "times": [...]}
+    }
+
+    method_params_dict = {
+        "PCG": (s1, s2, L),
+        "MG":  (s1, s2, L)
+    }
+    """
+
+    methods = list(method_results_dict.keys())
+    num_methods = len(methods)
+
+    # +1 extra subplot for shared time plot
+    fig, axes = plt.subplots(1, num_methods + 1, figsize=(5 * (num_methods + 1), 4))
+
+    # ==================== PER-METHOD CONVERGENCE SUBPLOTS ====================
+    for i, method in enumerate(methods):
+
+        results = method_results_dict[method]
+        regs = results["regs"]
+        s1, s2, L = method_params_dict[method]
+
+        ax = axes[i]
+
+        # Plot all convergence curves
+        for lam, res in zip(regs, results["residuals"]):
+            ax.plot(res, label=f"λ={lam}")
+
+        ax.set_yscale("log")
+        ax.set_xlabel("Iteration / V-cycle")
+        ax.set_ylabel("Relative residual")
+        ax.set_title(f"{method}")
+
+        # Subtitle with hyperparameters
+        ax.text(
+            0.5, -0.25,
+            f"s1={s1}, s2={s2}, L={L}",
+            ha="center", va="center", transform=ax.transAxes
+        )
+
+        ax.grid(True)
+        ax.legend()
+
+    # ==================== RUNTIME COMPARISON PLOT (last subplot) ====================
+    ax_time = axes[-1]
+
+    for method in methods:
+        regs = method_results_dict[method]["regs"]
+        times = method_results_dict[method]["times"]
+        ax_time.plot(regs, times, "-o", label=method, linewidth=2)
+
+    ax_time.set_xscale("log")
+    ax_time.set_yscale("log")
+    ax_time.set_xlabel("λ (regularisation parameter)")
+    ax_time.set_ylabel("Time (seconds)")
+    ax_time.set_title("Runtime vs λ")
+    ax_time.grid(True)
+    ax_time.legend()
 
     plt.tight_layout()
     plt.show()

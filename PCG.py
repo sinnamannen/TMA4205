@@ -17,7 +17,7 @@ def pcg_main(img1, img2, reg, max_level, s1, s2, tol=1.e-8, maxit=2000, from_fil
     return u, v , res, max_iter, elapsed_time
 
 
-def OF_pcg(u0, v0, Ix, Iy, reg, rhsu, rhsv, max_level=2, s1=3, s2=3, tol=1.e-8, maxit=200):
+def OF_pcg(u0, v0, Ix, Iy, reg, rhsu, rhsv, max_level=2, s1=3, s2=3, tol=1.e-8, maxit=30):
     '''
     The CG method for the optimal flow problem
     input:
